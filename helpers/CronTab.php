@@ -35,6 +35,14 @@ class CronTab
     protected $jobs = [];
 
     /**
+     *
+     */
+    public function __construct()
+    {
+        $this->updateListJobs();
+    }
+
+    /**
      * Set minute or minutes
      * @param string $minute required
      * @return $this
@@ -137,17 +145,13 @@ class CronTab
 
     /**
      * Save the jobs to disk, remove existing cron
-     * @param boolean $includeOldJobs optional
      * @return boolean
      */
-    public function activate($includeOldJobs = true)
+    public function activate()
     {
         $result = false;
-        $contents = implode("\n", $this->jobs) . "\n";
 
-        if ($includeOldJobs) {
-            $contents .= $this->listJobs();
-        }
+        $contents = implode("\n", $this->jobs) . "\n";
 
         if (is_writable($this->destination) || !file_exists($this->destination)) {
 
@@ -167,14 +171,15 @@ class CronTab
      */
     public function clearJobs()
     {
-       $this->jobs = [];
+        $this->jobs = [];
+        $this->clearJobsFile();
     }
 
     /**
      * Clear jobs file.
      * @return string exec result.
      */
-    public function clearJobsFile()
+    private function clearJobsFile()
     {
         return exec($this->crontab . ' -r;');
     }
@@ -183,8 +188,39 @@ class CronTab
      * List current cron jobs
      * @return string
      */
-    public function listJobs()
+    public function getListJobs()
     {
-        return exec($this->crontab . ' -l;');
+        $this->updateListJobs();
+
+        return $this->jobs;
+    }
+
+    /**
+     * @author Огеенко Константин <konstantinogeenko@gmail.com>
+     */
+    private function updateListJobs()
+    {
+        $this->jobs = [];
+        exec($this->crontab . ' -l;', $this->jobs);
+    }
+
+    /**
+     * Delete tasks by mask. If mask is empty - delete all tasks
+     * @author Огеенко Константин <konstantinogeenko@gmail.com>
+     * @param string $mask
+     */
+    public function deleteJobs($mask = '')
+    {
+        if (!empty($mask)) {
+            $this->updateListJobs();
+            foreach ($this->jobs as $id => $job) {
+                if (empty($job) || strpos($job, $mask)) {
+                    unset ($this->jobs[$id]);
+                }
+            }
+            $this->activate();
+        } else {
+            $this->clearJobs();
+        }
     }
 }
